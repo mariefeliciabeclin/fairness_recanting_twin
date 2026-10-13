@@ -1,14 +1,14 @@
 
 
-lambda1 = 1.2 
-lambda2 = 1.5
-gamma1 = 1.2 
-gamma2 = 1.2 
+lambda1 = 0.9
+lambda2 = -3
+gamma1 = 1.2
+gamma2 = -1.2
 
 
 
-generate_data <- function(n, lambda1 = lambda1, lambda2 = lambda2,
-                          gamma1 = gamma1, gamma2 = gamma2, seed = NULL) {
+generate_data <- function(n, lambda1, lambda2,
+                          gamma1 , gamma2 ,seed = NULL) {
   
   if (!is.null(seed)) set.seed(seed)
   expit <- plogis
@@ -72,14 +72,17 @@ g_formula_RT <- function(a, aprime, atilde, astar, data, models) {
   mean(S)
 }
 
-g_formula_S1(a, data, models){
+
+g_formula_S1<-function(a, data, models){
   f <- glm(Y ~ A + W1 + W2 + W3,
            data = Data, family = binomial())
-  mu <- predict(f, newdata = Data, type = "response")
-  mean(S)
+  df_f <- transform(data, A = a)
+  mu <- predict(f, newdata = df_f, type = "response")
+  mean(mu)
 }
 
-g_formula_natural(a,aprime, atilde, data, models){
+
+g_formula_natural<-function(a,aprime, atilde, data, models){
   duo <- expand.grid(m = 0:3, z = 0:3)
   f <- glm(Y ~ A+M + W1 + W2 + W3,
            data = Data, family = binomial())
@@ -110,14 +113,12 @@ g_formula_natural(a,aprime, atilde, data, models){
   
 
 
-true_g_formula_S1(a, data, models){
-  
-}
+
 
 
 true_g_formula_RT <- function(a, aprime, atilde, astar, n_mc = 1e6,
-                           lambda1 = 1.2, lambda2 = 1.5,
-                           gamma1 = 1.2, gamma2 = 1.2, seed = 123) {
+                              lambda1, lambda2,
+                              gamma1 , gamma2 , seed = 123) {
   
   set.seed(seed)
   W1 <- rbeta(n_mc, 2, 3)
@@ -147,8 +148,8 @@ true_g_formula_RT <- function(a, aprime, atilde, astar, n_mc = 1e6,
 
 
 true_g_formula_natural<- function(a, aprime, atilde, n_mc = 1e6,
-                              lambda1 = 1.2, lambda2 = 1.5,
-                              gamma1 = 1.2, gamma2 = 1.2, seed = 123) {
+                                  lambda1, lambda2,
+                                  gamma1 , gamma2 ,seed = 123) {
   
   set.seed(seed)
   W1 <- rbeta(n_mc, 2, 3)
@@ -167,18 +168,17 @@ true_g_formula_natural<- function(a, aprime, atilde, n_mc = 1e6,
     
     S <- S + mu *
       dbinom(m, 3, pm) *
-      dbinom(z, 3, pz) *
-      dbinom(zstar, 3, pzstar)
+      dbinom(z, 3, pz) 
   }
   
   mean(S)
 }
 
-psi_true <- true_g_formula(1, 0, 1, 0)
+#psi_true <- true_g_formula(1, 0, 1, 0)
 
-psi_hat <- g_formula(1, 0, 1, 0, data = Data, models = models)
+#psi_hat <- g_formula(1, 0, 1, 0, data = Data, models = models)
 
-c(True = psi_true, Estimated = psi_hat, Bias = psi_hat - psi_true)
+#c(True = psi_true, Estimated = psi_hat, Bias = psi_hat - psi_true)
 
 ##Test recanting twin : 
 
@@ -189,12 +189,18 @@ c(True = psi_true, Estimated = psi_hat, Bias = psi_hat - psi_true)
 ## S4 0,0,0,0
 
 
-psi_2_3 <- function(){
-  
-  
+psi_2_3 <- function(lambda1 , lambda2,
+                    gamma1, gamma2 ){
+  true_g_formula_natural(1,1,1,lambda1 = lambda1, lambda2 = lambda2,
+                         gamma1 = gamma1, gamma2 = gamma2, n_mc = 1e6)- true_g_formula_RT(1,1,1,1,lambda1 = lambda1, lambda2 = lambda2,
+                                                                                          gamma1 = gamma1, gamma2 = gamma2, n_mc = 1e4) + true_g_formula_RT(0,0,1,0,lambda1 = lambda1, lambda2 = lambda2,
+                                                                                                                                                            gamma1 = gamma1, gamma2 = gamma2, n_mc = 1e4) - true_g_formula_natural(0,0,1,lambda1 = lambda1, lambda2 = lambda2,
+                                                                                                                                                                                                                                   gamma1 = gamma1, gamma2 = gamma2, n_mc = 1e4)
 }
 
 
 
   
 
+psi_2_3(lambda1 = lambda1, lambda2 = lambda2,
+        gamma1 = gamma1, gamma2 = gamma2)
