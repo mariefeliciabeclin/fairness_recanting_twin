@@ -1,5 +1,21 @@
+theta = 0.4
+rho = 0.65
 
-generate_data <- function(n, theta = 0.4, rho = 0.65, seed = NULL) {
+mu <- function(data){ 0.13+0.06*data$A+0.10*data$Z+0.11*(data$M/3)^2+
+    0.07*sin(pi*data$W2)^2+0.05*data$W3^2+
+    0.18*(1+0.3*a)*(data$W1-theta)*z*(data$M/3)^2}
+
+pm <- function(data){plogis(
+  -1.5+1.2*data$Z+1.5*data$A+0.4*data$W2+0.2*data$W3
+)}
+pz <-  function(data){plogis(-1.7 + 1.5*data$A + 0.5*data$W3^2)}
+
+pa<- function(data){plogis(0.5*data$W1+0.5*data$W2-1)}
+
+
+true_models = list(mu=mu, pm=pm, pz=pz, pa=pa)
+
+generate_data <- function(n, seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
   
   Data <- data.frame(
@@ -46,7 +62,10 @@ fit_models <- function(Data) {
   h <- glm(Z ~ A + W1 + W2 + W3,
            data = Data, family = binomial())
   
-  return(list(f = f, g = g, h = h))
+  propensity <- glm(A ~w1 +W2+W3,
+                    data = Data, family = binomial())
+  
+  return(list(f = f, g = g, h = h, propensity=propensity))
 }
 
 models <- fit_models(Data)
@@ -80,24 +99,11 @@ g_formula_RT <- function(a, aprime, atilde, astar, data, models) {
 }
 
 
-g_formula_S1<-function(a, data, models){
-  f <- glm(Y ~ A + W1 + W2 + W3,
-           data = Data, family = binomial())
-  df_f <- transform(data, A = a)
-  mu <- predict(f, newdata = df_f, type = "response")
-  mean(mu)
-}
+
 
 
 g_formula_natural<-function(a,aprime, atilde, data, models){
   duo <- expand.grid(m = 0:3, z = 0:1)
-  f <- glm(Y ~ A+M + W1 + W2 + W3,
-           data = Data, family = binomial())
-  g <- glm(cbind(M, 3-M)  ~ A +  + W1 + W2 + W3,
-           data = Data, family = binomial())
-  h <- glm(Z ~ A + W1 + W2 + W3,
-           data = Data, family = binomial())
-  
   for (i in seq_len(nrow(duo))) {
     m <- duo$m[i]
     z <- duo$z[i]
@@ -110,16 +116,11 @@ g_formula_natural<-function(a,aprime, atilde, data, models){
     pm <- predict(models$g, newdata = df_g, type = "response")
     pz <- predict(models$h, newdata = df_z, type = "response")
     
-    S <- S + mu *
-      dbinom(m, size = 3, prob = pm) *
-      dbinom(z, size = 1, prob = pz) 
-  }
+    S <- S + mu *dbinom(m, size = 3, prob = pm) *dbinom(z, size = 1, prob = pz) }
   
   mean(S)
 }
   
-
-
 
 
 
@@ -231,8 +232,7 @@ true_g_formula_natural_ind<- function(a, aprime, atilde,astar,theta=0.4,rho=0.65
     
     
     S <- S + mu *
-      dbinom(m, 3, pm) *
-      pzzstar
+      dbinom(m, 3, pm) *pzzstar
   }
   
   mean(S)
@@ -288,5 +288,75 @@ S2S2()
 psi_2_3()
 
 
-### Looking for a DGP that gives psi2v3 =0:
+## Gradient of the constraint
+
+canonical_grad_RT<-function(a,aprime, atilde, astar, data, models){
+  df_f <- transform(data, A = a, M = m, Z = z)
+  df_gprime <- transform(data, A = atilde, Z = z)
+  df_g <- transform(data, A = a)
+  df_z <- transform(data, A = aprime)
+  df_zprime <- transform(data, A = a)
+  
+  S = dbinom(data$Z, 1, models$h(df_zprime))/ (dbinom(data$Z, 1, models$h(df_z))*dbinom(a, 1, models$propensity(data))*dbinom(data$M, 3,  models$g(df_g)))
+ 
+  ##zstar=1
+  df_gstar <- transform(data, A = atilde, Z=1)
+  df_z <- transform(data, A = astar)
+  S=S*dbinom(data$M, 3, models$g(df_gstar))*dbinom(1, 1, models$h(df_z))
+  
+  ##zstar=0
+  df_gstar <- transform(data, A = atilde, Z=0)
+  df_z <- transform(data, A = astar)
+  S=S+S*dbinom(data$M, 3, models$g(df_gstar))*dbinom(0, 1, models$h(df_z))
+  S=S*(data$A==a)
+  return(S)
+}
+
+sigma<-function(a,aprime, atilde, astar,b,bprime, btilde, bstar, data ){
+  mean((canonical_grad_RT(a,aprime, atilde, astar, data, models) - canonical_grad_RT(b,bprime, btilde, bstar, data, models))**2)}
+
+
+canonical_grad_RT_true_model<-function(a,aprime, atilde, astar, data, models=true_models){
+  df_f <- transform(data, A = a, M = m, Z = z)
+  df_gprime <- transform(data, A = atilde, Z = z)
+  df_g <- transform(data, A = a)
+  df_z <- transform(data, A = aprime)
+  df_zprime <- transform(data, A = a)
+  
+  S = dbinom(data$Z, 1, models$pz(df_zprime))/ (dbinom(data$Z, 1, models$pz(df_z))*dbinom(a, 1, models$pa(data))*dbinom(data$M, 3,  models$pm(df_g)))
+  
+  ##zstar=1
+  df_gstar <- transform(data, A = atilde, Z=1)
+  df_z <- transform(data, A = astar)
+  S=S*dbinom(data$M, 3, models$pm(df_gstar))*dbinom(1, 1, models$pz(df_z))
+  
+  ##zstar=0
+  df_gstar <- transform(data, A = atilde, Z=0)
+  df_z <- transform(data, A = astar)
+  S=S+S*dbinom(data$M, 3, models$pm(df_gstar))*dbinom(0, 1, models$pz(df_z))
+  S=S*(data$A==a)
+  return(S)
+}
+
+sigma_true_model<-function(a,aprime, atilde, astar,b,bprime, btilde, bstar){
+  data=generate_data(n=1e6)
+  mean((canonical_grad_RT(a,aprime, atilde, astar, data, models) - canonical_grad_RT(b,bprime, btilde, bstar, data, models))**2)}
+
+
+
+
+### result with P3 constraint
+
+psi_star_0 <- function(data, models=true_models){
+  mu(data)- (canonical_grad_RT_true_model(1,1,0,1)- canonical_grad_RT_true_model(1,0,0,1))/sigma_true_model(1,1,0,1,1,0,0,1 )
+  
+  
+}
+
+psi_star_hat <- function(data, models=true_models){
+  mu(data)- (canonical_grad_RT(1,1,0,1)- canonical_grad_RT_true_model(1,0,0,1))/sigma(1,1,0,1,1,0,0,1 )
+  
+  
+}
+
 
