@@ -3,7 +3,7 @@
 lambda1 = 0.9
 lambda2 = -3
 gamma1 = 1.2
-gamma2 = -1.2
+gamma2 = -0.52
 
 
 
@@ -157,13 +157,13 @@ true_g_formula_natural<- function(a, aprime, atilde, n_mc = 1e6,
   W3 <- rbeta(n_mc, 2, 3)
   
   S <- numeric(n_mc)
-  triplets <- expand.grid(m = 0:3, z = 0:3, zstar = 0:3)
+  triplets <- expand.grid(m = 0:3, z = 0:3)
   
   for (i in seq_len(nrow(triplets))) {
-    m <- triplets$m[i]; z <- triplets$z[i]; zstar <- triplets$zstar[i]
+    m <- triplets$m[i]; z <- triplets$z[i]
     
     mu <- plogis(0.4*m + gamma1*z + gamma2*a - 0.5*cos(W1) - 1.5)
-    pm <- plogis(-1.5 + lambda1*zstar + lambda2*atilde + 0.4*W2 + 0.2*W3)
+    pm <- plogis(-1.5 + lambda1*z + lambda2*atilde + 0.4*W2 + 0.2*W3)
     pz <- plogis(-1.7 + 1.5*aprime + 0.5*W3^2)
     
     S <- S + mu *
@@ -200,7 +200,34 @@ psi_2_3 <- function(lambda1 , lambda2,
 
 
 
+S1S1 <- function(lambda1 , lambda2,
+                    gamma1, gamma2 ){
+  true_g_formula_natural(1,1,1,lambda1 = lambda1, lambda2 = lambda2,
+                         gamma1 = gamma1, gamma2 = gamma2, n_mc = 1e6)- true_g_formula_RT(1,1,1,1,lambda1 = lambda1, lambda2 = lambda2,
+                                                                                          gamma1 = gamma1, gamma2 = gamma2, n_mc = 1e4) 
+}
+
+S3S3 <- function(lambda1 , lambda2,
+                 gamma1, gamma2 ){
+  true_g_formula_natural(0,0,1,lambda1 = lambda1, lambda2 = lambda2,
+                         gamma1 = gamma1, gamma2 = gamma2, n_mc = 1e6)- true_g_formula_RT(0,0,1,0,lambda1 = lambda1, lambda2 = lambda2,
+                                                                                          gamma1 = gamma1, gamma2 = gamma2, n_mc = 1e4) 
+}
+
+
+
+
+S3S3(lambda1 = lambda1, lambda2 = lambda2,
+     gamma1 = gamma1, gamma2 = gamma2)
+
+
+S1S1(lambda1 = lambda1, lambda2 = lambda2,
+     gamma1 = gamma1, gamma2 = gamma2)
   
 
 psi_2_3(lambda1 = lambda1, lambda2 = lambda2,
         gamma1 = gamma1, gamma2 = gamma2)
+
+
+### Looking for a DGP that gives psi2v3 =0:
+
